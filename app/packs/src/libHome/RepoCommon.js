@@ -1,7 +1,7 @@
 /* eslint-disable react/forbid-prop-types */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 /* eslint-disable react/no-multi-comp */
-import React, { Component } from 'react';
+import React, { Component, useState, useEffect } from 'react';
 import SVG from 'react-inlinesvg';
 import { replace } from 'lodash';
 import {
@@ -96,6 +96,20 @@ const CollectionDesc = (props) => {
     </div>
   );
 };
+
+const ResizableSvgWrapper = ({ path }) => {
+  const [state, setState] = useState({ show: true, path: path })
+
+  useEffect(() => {
+    if (path == state.path) {
+      setState({ show: true })
+    } else {
+      setState({ show: false, path: path })
+    }
+  }, [path])
+
+  return state.show && resizableSvg(path)
+}
 
 const resizableSvg = (path, extra = null) => (
   <div className="preview-table" style={{ cursor: 'row-resize' }}>
@@ -990,7 +1004,7 @@ const RenderAnalysisHeader = (props) => {
       <br />
       <Row style={rinchiStyle}>
         <Col sm={6} md={6} lg={6}>
-          {resizableSvg(svgPath)}
+          <ResizableSvgWrapper path={svgPath} />
         </Col>
         <Col sm={6} md={6} lg={6}>
           <span className="repo-pub-sample-header">
