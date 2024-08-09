@@ -77,7 +77,10 @@ const RepoReactionList = (props) => {
     element, currentElement, isPubElement, schemeOnly
   } = props;
   const listClass = (currentElement !== null && currentElement && currentElement.id === element.id) ? 'list_focus_on' : 'list_focus_off';
-  return (
+
+  // reaction.show is determined in PublicStore.handleGetReactions, shown are only
+  // reactions with no new_version or where the new_version is not published
+  return element.show && (
     <Col md={isPubElement === true ? 12 : 6} key={`list-reaction-${element.id}`} onClick={() => PublicActions.displayReaction(element.id)}>
       <div className={`home_reaction ${listClass}`}>
         <Row key={`list-reaction-svg-${element.id}`}>

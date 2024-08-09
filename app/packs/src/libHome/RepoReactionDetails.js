@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { Panel, Row, Col, Button, Jumbotron } from 'react-bootstrap';
 import PropTypes from 'prop-types';
-import { head, filter } from 'lodash';
+import { head, filter, isNil } from 'lodash';
 import { RepoCommentModal } from 'repo-review-ui';
 import ArrayUtils from '../components/utils/ArrayUtils';
 import {
@@ -33,6 +33,8 @@ import LicenseIcon from '../components/chemrepo/LicenseIcon';
 import PublicAnchor from '../components/chemrepo/PublicAnchor';
 import PublicCommentModal from '../components/chemrepo/PublicCommentModal';
 import UserCommentModal from '../components/chemrepo/UserCommentModal';
+import NewVersionModal from '../components/chemrepo/NewVersionModal';
+import VersionDropdown from '../components/chemrepo/VersionDropdown';
 import QuillViewer from '../components/QuillViewer';
 import {
   Citation,
@@ -60,6 +62,7 @@ export default class RepoReactionDetails extends Component {
       showCommentModal: false,
       commentField: '',
       originInfo: '',
+      displayedProducts: isNil(props.reaction) ? [] : [...props.reaction.products]
     };
 
     this.toggleScheme = this.toggleScheme.bind(this);
@@ -73,6 +76,12 @@ export default class RepoReactionDetails extends Component {
     this.handleSubmitReview = this.handleSubmitReview.bind(this);
     this.handleCommentBtn = this.handleCommentBtn.bind(this);
     this.handleSubmitComment = this.handleSubmitComment.bind(this);
+  }
+
+  componentDidUpdate(prevProps) {
+    if (this.props.reaction !== prevProps.reaction) {
+      this.setState({ displayedProducts: this.props.reaction.products });
+    }
   }
 
   toggleScheme() {
@@ -389,6 +398,13 @@ export default class RepoReactionDetails extends Component {
           updateRepoXvial={() => this.updateRepoXvial()}
           xvialCom={product.xvialCom}
           literatures={references}
+          onVersionChange={(product, version) => {
+            this.setState({
+              displayedProducts: this.state.displayedProducts.map((sample) => (sample.id == product.id) ? {
+                ...version, versions: product.versions // propagate the versions array to the newly selected version
+              } : sample)
+            })
+          }}
         />
       ) : (
         <span />
@@ -480,11 +496,12 @@ export default class RepoReactionDetails extends Component {
   }
 
   renderProductAnalysisView(
-    products,
     isLogin = false,
     isReviewer = false,
     references = []
   ) {
+    const products = this.state.displayedProducts;
+
     if (typeof products === 'undefined' || !products || products.length === 0) {
       return <span />;
     }
@@ -596,6 +613,8 @@ export default class RepoReactionDetails extends Component {
       typeof reaction.isLogin === 'undefined' ? true : reaction.isLogin;
     const idyReview =
       typeof reaction.isReviewer === 'undefined' ? false : reaction.isReviewer;
+    const idyPublisher =
+      typeof reaction.isPublisher === 'undefined' ? false : reaction.isPublisher;
     const userInfo = (reaction.infos && reaction.infos.pub_info) || '';
 
     let embargo = <span />;
@@ -627,6 +646,7 @@ export default class RepoReactionDetails extends Component {
         </span>
       );
     }
+
     return (
       <div style={{ border: 'none' }}>
         <div>
@@ -673,6 +693,7 @@ export default class RepoReactionDetails extends Component {
                   taggData.author_ids && taggData.author_ids.length > 1
                 }
               />
+              &nbsp;
               <PublicCommentModal
                 isReviewer={idyReview}
                 id={reaction.id}
@@ -687,7 +708,20 @@ export default class RepoReactionDetails extends Component {
                 type="Reaction"
                 title={`Reaction, CRR-${pubData.id}`}
               />
+              &nbsp;
+              <NewVersionModal
+                type="Reaction"
+                element={reaction}
+                isPublisher={idyPublisher}
+                isLatestVersion={!reaction.new_version}
+                schemeOnly={schemeOnly}
+              />
             </h4>
+            <VersionDropdown
+              type="Reaction"
+              element={reaction}
+              onChange={(version) => PublicActions.displayReaction(version.id)}
+            />
             <br />
             <ContributorInfo
               contributor={taggData.contributors}
@@ -735,7 +769,6 @@ export default class RepoReactionDetails extends Component {
             {schemeOnly
               ? ''
               : this.renderProductAnalysisView(
-                  reaction.products,
                   idyLogin,
                   idyReview,
                   literatures

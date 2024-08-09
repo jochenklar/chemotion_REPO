@@ -134,6 +134,8 @@ class ChemotionRepoPublishingJob < ActiveJob::Base
 
   def completed
     remove_publish_pending
+    replace_old_sample_version_in_reaction
+
     if ENV['PUBLISH_MODE'] == 'production'
       PublicationMailer.mail_publish_approval(@publication.id).deliver_now
     end
@@ -159,13 +161,42 @@ class ChemotionRepoPublishingJob < ActiveJob::Base
   end
 
   def remove_publish_pending
-    return if @publication.original_element.nil?
-    ot = @publication.original_element&.tag&.taggable_data&.delete('publish_pending')
-    @publication.original_element&.tag.save! unless ot.nil?
-    if @publication.element_type == 'Reaction'
-      @publication.original_element&.samples&.each do |s|
-        t = s.tag&.taggable_data&.delete('publish_pending')
-        s.tag.save! unless t.nil?
+    unless @element&.tag&.taggable_data['previous_version'].nil?
+      @element&.tag&.taggable_data&.delete('publish_pending')
+      @element&.tag.save!
+    else
+      return if @publication.original_element.nil?
+      ot = @publication.original_element&.tag&.taggable_data&.delete('publish_pending')
+      @publication.original_element&.tag.save! unless ot.nil?
+      if @publication.element_type == 'Reaction'
+        @publication.original_element&.samples&.each do |s|
+          t = s.tag&.taggable_data&.delete('publish_pending')
+          s.tag.save! unless t.nil?
+        end
+      end
+    end
+  end
+
+  def replace_old_sample_version_in_reaction
+    # check if this is a new version of a sample in a public reaction
+    # if so, replace the previous version in this reaction
+    unless @element&.tag&.taggable_data['previous_version'].nil?
+      return unless @publication.element_type == 'Sample'
+
+      if @element&.tag&.taggable_data['replace_in_publication']
+        previous_version_id = @element&.tag&.taggable_data['previous_version']['id']
+        reaction_id = @element&.tag&.taggable_data['reaction_id']
+
+        unless reaction_id.nil?
+          reaction = Collection.public_collection.reactions.find_by(id: reaction_id)
+          unless reaction.nil?
+            reaction_sample = reaction.reactions_samples.find_by(sample_id: previous_version_id)
+            reaction_sample.sample_id = @element.id
+            reaction_sample.save!
+
+            @element.untag_replace_in_publication
+          end
+        end
       end
     end
   end

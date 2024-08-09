@@ -7,7 +7,7 @@ import {
 } from 'react-bootstrap';
 import Select from 'react-select';
 import Immutable from 'immutable';
-import { sortedUniq } from 'lodash';
+import { get, isUndefined, sortedUniq } from 'lodash';
 
 import Sample from './models/Sample';
 import SampleDetailsContainers from './SampleDetailsContainers';
@@ -43,6 +43,7 @@ export default class PublishSampleModal extends Component {
       sortedIds: [],
       selectedEmbargo: '-1',
       selectedLicense: 'CC BY',
+      disableLicense: false,
       cc0Consent: { consent1: false, consent2: false },
       bundles: [],
       noEmbargo: false
@@ -70,10 +71,38 @@ export default class PublishSampleModal extends Component {
   }
 
   componentWillReceiveProps(nextProps) {
+    const { currentUser } = UserStore.getState();
+
+    const newVersion = !isUndefined(get(nextProps.sample, 'tag.taggable_data.previous_version'));
+
+    const previousLicense = get(nextProps.sample, 'tag.taggable_data.previous_version.license');
+    const previousUsers = get(nextProps.sample, 'tag.taggable_data.previous_version.users', []);
+
+    let meAsAuthor = false
+    let behalfAsAuthor = false
+    const selectedUsers = []
+    previousUsers.forEach((user) => {
+      if (user.id == currentUser.id) {
+        meAsAuthor = true
+      } else {
+        behalfAsAuthor = true
+        selectedUsers.push({
+          label: user.name,
+          value: user.id
+        })
+      }
+    })
+
     this.loadReferences();
     this.loadMyCollaborations();
     this.setState({
       sample: nextProps.sample,
+      selectedLicense: isUndefined(previousLicense) ? 'CC BY' : previousLicense,
+      disableLicense: !isUndefined(previousLicense),
+      meAsAuthor,
+      behalfAsAuthor,
+      selectedUsers,
+      newVersion
     });
   }
 
@@ -113,10 +142,20 @@ export default class PublishSampleModal extends Component {
   }
 
   loadReferences() {
-    let { selectedRefs } = this.state;
+    let { selectedRefs, newVersion } = this.state;
     LiteraturesFetcher.fetchElementReferences(this.state.sample).then((literatures) => {
       const sortedIds = groupByCitation(literatures);
       selectedRefs = selectedRefs.filter(item => sortedIds.includes(item));
+
+      // pre-select all refs when submitting a new version
+      if (newVersion) {
+        literatures.forEach(literature => {
+          if (!selectedRefs.includes(literature.literal_id)) {
+            selectedRefs.push(literature.literal_id)
+          }
+        });
+      }
+
       this.setState({ selectedRefs, literatures, sortedIds });
     });
   }
@@ -166,8 +205,8 @@ export default class PublishSampleModal extends Component {
 
   // molecule-submissions mandatory check (https://git.scc.kit.edu/ComPlat/chemotion_REPO/issues/236)
   validateSubmission() {
-    const { sample, selectedEmbargo, noEmbargo } = this.state;
-    if (selectedEmbargo === '-1' && !noEmbargo) return false;
+    const { sample, selectedEmbargo, noEmbargo, newVersion } = this.state;
+    if (selectedEmbargo === '-1' && !noEmbargo && !newVersion) return false;
     const analyses = sample.analysisArray();
     if (!this.validateAnalyses()) {
       return false;
@@ -190,12 +229,12 @@ export default class PublishSampleModal extends Component {
   }
 
   handlePublishSample() {
-    const { selectedLicense, cc0Consent } = this.state;
+    const { selectedLicense, disableLicense, cc0Consent } = this.state;
     const authorCount = this.state.selectedUsers && this.state.selectedUsers.length;
     // const reviewerCount = this.state.selectedReviewers && this.state.selectedReviewers.length;
     const plural = authorCount > 0 ? 's' : '';
 
-    if (selectedLicense === 'CC0' && (!cc0Consent.consent1 || !cc0Consent.consent2)) {
+    if (selectedLicense === 'CC0' && !disableLicense && (!cc0Consent.consent1 || !cc0Consent.consent2)) {
       alert('Please check the license section before sending your data.');
       return true;
     }
@@ -280,7 +319,7 @@ export default class PublishSampleModal extends Component {
   }
 
   selectUsers() {
-    const { selectedUsers, collaborations } = this.state;
+    const { selectedUsers, collaborations, meAsAuthor, behalfAsAuthor } = this.state;
     const options = collaborations.map(c => (
       { label: c.name, value: c.id }
     ));
@@ -299,8 +338,8 @@ export default class PublishSampleModal extends Component {
 
     return (
       <div >
-        <Checkbox inputRef={(ref) => { this.refMeAsAuthor = ref; }}>add me as author</Checkbox>
-        <Checkbox inputRef={(ref) => { this.refBehalfAsAuthor = ref; }}>
+        <Checkbox defaultChecked={meAsAuthor} inputRef={(ref) => { this.refMeAsAuthor = ref; }}>add me as author</Checkbox>
+        <Checkbox defaultChecked={behalfAsAuthor} inputRef={(ref) => { this.refBehalfAsAuthor = ref; }}>
           I am contributing on behalf of the author{authorCount > 0 ? 's' : ''}
         </Checkbox>
         <h5><b>Authors:</b></h5>
@@ -466,7 +505,7 @@ export default class PublishSampleModal extends Component {
 
   render() {
     const { show, onHide, sample } = this.props;
-    const { bundles } = this.state;
+    const { bundles, newVersion } = this.state;
     const canPublish = this.validateSubmission(); // this.validateAnalyses();
     const {
       showPreview,
@@ -481,10 +520,10 @@ export default class PublishSampleModal extends Component {
     const { molecule } = sample;
 
     const {
-      selectedEmbargo, selectedLicense, cc0Consent, noEmbargo
+      selectedEmbargo, selectedLicense, disableLicense, cc0Consent, noEmbargo
     } = this.state;
 
-    const awareEmbargo = selectedEmbargo === '-1' ? (
+    const awareEmbargo = selectedEmbargo === '-1' && !newVersion ? (
       <Checkbox
         onChange={() => { this.handleNoEmbargoCheck(); }}
         checked={noEmbargo}
@@ -516,6 +555,7 @@ export default class PublishSampleModal extends Component {
                 selectedValue={selectedEmbargo}
                 onEmbargoChange={this.handleEmbargoChange}
                 selectedLicense={selectedLicense}
+                disableLicense={disableLicense}
                 onLicenseChange={this.handleLicenseChange}
                 onCC0ConsentChange={this.handleCC0ConsentChange}
                 cc0Deed={cc0Consent}

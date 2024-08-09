@@ -478,7 +478,8 @@ module Chemotion
             (select count(*) from publication_ontologies po where po.element_type = 'Reaction' and po.element_id = reactions.id) as ana_cnt,
             (select "collections".label from "collections" inner join collections_reactions cr on collections.id = cr.collection_id and cr.deleted_at is null
             and cr.reaction_id = reactions.id where "collections"."deleted_at" is null and (ancestry in (
-            select c.id::text from collections c where c.label = 'Published Elements')) order by position asc limit 1) as embargo
+            select c.id::text from collections c where c.label = 'Published Elements')) order by position asc limit 1) as embargo,
+            (select taggable_data -> 'new_version' -> 'id' from element_tags where taggable_type = 'Reaction' and taggable_id = reactions.id) as new_version
           SQL
 
           if params[:scheme_only]
@@ -533,14 +534,34 @@ module Chemotion
       resource :last_published do
         desc "Return Last PUBLIC serialized entities"
         get do
+          res = {
+            last_published: {}
+          }
+
           s_pub = Publication.where(element_type: 'Sample', state: 'completed').order(:published_at).last
-          sample = s_pub.element
+          unless s_pub.nil?
+            sample = s_pub.element
+            res["sample"] = {
+              id: sample.id,
+              sample_svg_file: sample.sample_svg_file,
+              molecule: sample.molecule,
+              tag: s_pub.taggable_data,
+              contributor: User.find(s_pub.published_by).name
+            }
+          end
 
           r_pub = Publication.where(element_type: 'Reaction', state: 'completed').order(:published_at).last
-          reaction = r_pub.element
+          unless r_pub.nil?
+            reaction = r_pub.element
+            res["reaction"] = {
+              id: reaction.id,
+              reaction_svg_file: reaction.reaction_svg_file,
+              tag: r_pub.taggable_data,
+              contributor: User.find(r_pub.published_by).name
+            }
+          end
 
-          { last_published: { sample: { id: sample.id, sample_svg_file: sample.sample_svg_file, molecule: sample.molecule, tag: s_pub.taggable_data, contributor: User.find(s_pub.published_by).name  },
-          reaction: { id: reaction.id, reaction_svg_file: reaction.reaction_svg_file, tag: r_pub.taggable_data, contributor: User.find(r_pub.published_by).name } } }
+          res
         end
       end
 

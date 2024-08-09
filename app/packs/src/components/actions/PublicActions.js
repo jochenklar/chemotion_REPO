@@ -321,6 +321,10 @@ class PublicActions {
         }).catch((errorMessage) => { console.log(errorMessage); });
     };
   }
+
+  selectSampleVersion(version) {
+    return version;
+  }
 }
 
 export default alt.createActions(PublicActions)

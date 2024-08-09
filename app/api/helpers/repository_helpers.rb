@@ -11,6 +11,8 @@ module RepositoryHelpers
       reactions.rinchi_string, reactions.rinchi_long_key, reactions.rinchi_short_key,reactions.rinchi_web_key,
       (select label from publication_collections where (elobj ->> 'element_type')::text = 'Reaction' and (elobj ->> 'element_id')::integer = reactions.id) as embargo,
       (select json_extract_path(taggable_data::json, 'publication') from publications where element_type = 'Reaction' and element_id = reactions.id) as publication,
+      (select taggable_data -> 'new_version' -> 'id' from element_tags where taggable_type = 'Reaction' and taggable_id = reactions.id) as new_version,
+      (select taggable_data -> 'versions' from element_tags where taggable_type = 'Reaction' and taggable_id = reactions.id) as versions,
       reactions.duration
       SQL
     )
@@ -46,6 +48,16 @@ module RepositoryHelpers
       pub_product_tag = pub_product[:tag]['taggable_data']
       next if pub_product_tag.nil?
 
+      unless pub_product_tag['versions'].nil?
+        p[:versions] = pub_product_tag['versions'].reduce([]) do |versions, version_id|
+          sample = Sample.find(version_id)
+          if sample.publication.state == 'completed'
+            versions.append Entities::SampleEntity.represent(sample, serializable: true)
+          end
+          versions
+        end
+      end
+
       xvial = pub_product_tag['xvial'] && pub_product_tag['xvial']['num']
       next unless xvial.present?
 
@@ -61,6 +73,9 @@ module RepositoryHelpers
     entities[:embargo] = reaction.embargo
     entities[:infos] = { pub_info: pub_info, pd_infos: pd_infos, ana_infos: ana_infos }
     entities[:isReviewer] = current_user.present? && User.reviewer_ids.include?(current_user.id) ? true : false
+    entities[:isPublisher] = (current_user.present? && current_user.id == pub.published_by)
+    entities[:new_version] = reaction.new_version
+    entities[:versions] = reaction.versions
     entities[:elementType] = 'reaction'
     entities[:segments] = Entities::SegmentEntity.represent(reaction.segments)
     entities
@@ -93,7 +108,11 @@ module RepositoryHelpers
       )
       .select(
         <<~SQL
-        samples.*, (select published_at from publications where element_type='Sample' and element_id=samples.id and deleted_at is null) as published_at
+        samples.*,
+        (select published_at from publications where element_type='Sample' and element_id=samples.id and deleted_at is null) as published_at,
+        (select taggable_data -> 'new_version' -> 'id' from element_tags where taggable_type = 'Sample' and taggable_id = samples.id) as new_version,
+        (select taggable_data -> 'versions' from element_tags where taggable_type = 'Sample' and taggable_id = samples.id) as versions,
+        (select taggable_data -> 'reaction_id' from element_tags where taggable_type = 'Sample' and taggable_id = samples.id) as reaction_id
         SQL
       )
       .order('published_at desc')
@@ -115,6 +134,9 @@ module RepositoryHelpers
           SQL
         ).group('literatures.id').as_json
       reaction_ids = ReactionsProductSample.where(sample_id: s.id).pluck(:reaction_id)
+      if reaction_ids.empty? and not s.reaction_id.nil?
+        reaction_ids = [s.reaction_id]
+      end
       pub = Publication.find_by(element_type: 'Sample', element_id: s.id)
       sid = pub.taggable_data["sid"] unless pub.nil? || pub.taggable_data.nil?
       xvial = s.tag.taggable_data['xvial'] && s.tag.taggable_data['xvial']['num'] unless s.tag.taggable_data.nil?
@@ -133,8 +155,14 @@ module RepositoryHelpers
       end
       embargo = PublicationCollections.where("(elobj ->> 'element_type')::text = 'Sample' and (elobj ->> 'element_id')::integer = #{s.id}")&.first&.label
       segments = Entities::SegmentEntity.represent(s.segments)
-      tag.merge(analyses: containers, literatures: literatures, sample_svg_file: s.sample_svg_file, short_label: s.short_label, melting_point: s.melting_point, boiling_point: s.boiling_point,
-        sample_id: s.id, reaction_ids: reaction_ids, sid: sid, xvial: xvial, embargo: embargo, showed_name: s.showed_name, pub_id: pub.id, ana_infos: ana_infos, pub_info: pub_info, segments: segments)
+      isPublisher = (current_user.present? && current_user.id == pub.published_by)
+      tag.merge(analyses: containers, literatures: literatures,
+                sample_svg_file: s.sample_svg_file, short_label: s.short_label,
+                melting_point: s.melting_point, boiling_point: s.boiling_point,
+                sample_id: s.id, reaction_ids: reaction_ids, sid: sid, xvial: xvial,
+                embargo: embargo, showed_name: s.showed_name, pub_id: pub.id, ana_infos: ana_infos,
+                pub_info: pub_info, segments: segments, isPublisher: isPublisher, new_version: s.new_version,
+                versions: s.versions)
     end
     x = published_samples.select { |s| s[:xvial].present? }
     xvial_com[:hasSample] = x.length.positive?

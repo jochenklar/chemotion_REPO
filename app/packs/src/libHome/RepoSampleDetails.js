@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { Panel } from 'react-bootstrap';
 import PropTypes from 'prop-types';
 import { RepoCommentModal } from 'repo-review-ui';
+import { isEmpty } from 'lodash';
 import {
   ClosePanel,
   MoleculeInfo,
@@ -101,6 +102,11 @@ export default class RepoSampleDetails extends Component {
 
     tagData = (pubData?.taggable_data) || {};
     const details = (samples || []).map((s) => {
+      // only display the active version
+      if (isEmpty(review) && !s.show) {
+        return null;
+      }
+
       if (isPublished) {
         pubData = {
           id: s.pub_id
@@ -135,6 +141,8 @@ export default class RepoSampleDetails extends Component {
         segments: s.segments || [],
         boiling_point: s.boiling_point || '',
         melting_point: s.melting_point || '',
+        new_version: s.new_version,
+        versions: (s.versions || []).map(v => samples.find(e => (e.sample_id === v)))
       };
 
       return (
@@ -146,6 +154,7 @@ export default class RepoSampleDetails extends Component {
           handleCommentBtn={this.handleCommentBtn}
           isLogin={idyLogin}
           isReviewer={idyReview}
+          isPublisher={s.isPublisher}
           {...this.props}
         />
       );

@@ -423,7 +423,7 @@ export default class SampleForm extends React.Component {
 
   sampleAmount(sample) {
     const content = [];
-    const isDisabled = !permitOn(sample);
+    const isDisabled = !permitOn(sample) || sample.check_replace_in_publication();
     const volumeBlocked = !sample.has_density && !sample.has_molarity;
 
     if (sample.isMethodDisabled('amount_value') === false) {
@@ -615,18 +615,18 @@ export default class SampleForm extends React.Component {
                         <Tabs style={{ width: '60%' }} id="tab-density-molarity" defaultActiveKey={sample.molarity_value !== 0 ? 'molarity' : 'density'}>
                           <Tab eventKey="density" title="Density">
                             {
-                              this.numInputWithoutTable(sample, 'density', 'g/ml', ['n'], 5, '', '', polyDisabled, '', false, isPolymer)
+                              this.numInputWithoutTable(sample, 'density', 'g/ml', ['n'], 5, '', '', polyDisabled || sample.check_replace_in_publication(), '', false, isPolymer)
                             }
                           </Tab>
                           <Tab eventKey="molarity" title="Molarity">
                             {
-                              this.numInputWithoutTable(sample, 'molarity_value', 'M', ['n'], 5, '', '', polyDisabled, '', false, isPolymer)
+                              this.numInputWithoutTable(sample, 'molarity_value', 'M', ['n'], 5, '', '', polyDisabled || sample.check_replace_in_publication(), '', false, isPolymer)
                             }
                           </Tab>
                         </Tabs>
                         <div style={{ width: '40%', paddingLeft: '5px' }}>
                           {
-                            this.numInputWithoutTable(sample, 'purity', 'n', ['n'], 5, 'Purity/Concentration', '', isDisabled)
+                            this.numInputWithoutTable(sample, 'purity', 'n', ['n'], 5, 'Purity/Concentration', '', isDisabled || sample.check_replace_in_publication())
                           }
                         </div>
                       </div>

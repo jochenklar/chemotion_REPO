@@ -169,6 +169,100 @@ module Publishing
       end
     end
 
+    def tag_as_new_version(previous_element, scheme_only: false)
+      previous_license = previous_element&.tag&.taggable_data['publication']['license']
+      previous_users = previous_element&.tag&.taggable_data['publication']['creators']
+
+      element_tag = self.tag
+      element_tag.update!(
+        taggable_data: (element_tag.taggable_data || {}).merge(
+          previous_version: {
+            id: previous_element.id,
+            doi: {
+              id: previous_element&.doi&.id
+            },
+            license: previous_license,
+            scheme_only: scheme_only,
+            users: previous_users
+          }
+        )
+      )
+    end
+
+    def tag_replace_in_publication
+      element_tag = self.tag
+      element_tag.update!(
+        taggable_data: (element_tag.taggable_data || {}).merge(
+          replace_in_publication: true
+        )
+      )
+    end
+
+    def untag_replace_in_publication
+      element_tag = self.tag
+
+      taggable_data = element_tag.taggable_data || {}
+      taggable_data.delete('replace_in_publication')
+
+      element_tag.update!(
+        taggable_data: taggable_data
+      )
+    end
+
+    def update_versions_tag
+      element_tag = self.tag
+
+      if element_tag.taggable_data['new_version'].nil?
+        # recursively find all versions of the latest element
+        versions = self.find_versions
+      else
+        # copy the list of versions from the latest element
+        new_version = self.class.find_by(id: element_tag.taggable_data['new_version']['id'])
+        versions = new_version&.tag&.taggable_data['versions']
+      end
+
+      element_tag.update!(
+        taggable_data: (element_tag.taggable_data || {}).merge(
+          versions: versions
+        )
+      )
+
+      # call this method recursively for all versions
+      unless element_tag.taggable_data['previous_version'].nil?
+        previous_version = self.class.find_by(id: element_tag.taggable_data['previous_version']['id'])
+        previous_version.update_versions_tag
+      end
+    end
+
+    def find_versions
+      element_tag = self.tag
+      versions = [self.id]
+
+      unless element_tag.taggable_data['previous_version'].nil?
+        previous_version = self.class.find_by(id: element_tag.taggable_data['previous_version']['id'])
+        versions += previous_version.find_versions
+      end
+
+      return versions
+    end
+
+    def tag_as_previous_version(new_element)
+      element_tag = self.tag
+      element_tag.update!(
+        taggable_data: (element_tag.taggable_data || {}).merge(
+          new_version: {
+            id: new_element.id
+          })
+      )
+    end
+
+    def untag_as_previous_version
+      element_tag = self.tag
+      taggable_data = element_tag.taggable_data || {}
+      taggable_data.delete('new_version')
+      element_tag.update!(taggable_data: taggable_data)
+    end
+
     def tag_reserved_suffix(ori_analyses)
       et = self.tag
       et.update!(
@@ -223,6 +317,18 @@ module Publishing
         end
       end
       true
+    end
+
+    def get_new_version_short_label
+      m = self.previous_version.short_label.match /^(.*)-V(\d+)$/
+      if m
+        # increment the version part of the short_label of the previous version
+        version = Integer(m[2]) + 1
+        self.short_label = "#{m[1]}-V#{version}"
+      else
+        # append "-V1" to the short_label of the previous version
+        self.short_label = "#{self.previous_version.short_label}-V1"
+      end
     end
   end
 end
