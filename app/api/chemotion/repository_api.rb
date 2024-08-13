@@ -36,12 +36,17 @@ module Chemotion
             else
               d = Doi.create_for_analysis!(new_ana, ik)
             end
+
+            # create concept and concept doi
+            c = Concept.create_for_doi!(d)
+
             Publication.create!(
               state: Publication::STATE_PENDING,
               element: new_ana,
               original_element: ana,
               published_by: current_user.id,
               doi: d,
+              concept: c,
               parent: new_element.publication,
               taggable_data: @publication_tag.merge(
                 author_ids: @author_ids
@@ -132,12 +137,17 @@ module Chemotion
             else
               d = Doi.create_for_element!(new_sample)
             end
+
+            # create concept and concept doi
+            c = Concept.create_for_doi!(d)
+
             pub = Publication.create!(
               state: Publication::STATE_PENDING,
               element: new_sample,
               original_element: sample,
               published_by: current_user.id,
               doi: d,
+              concept: c,
               parent_id: parent_publication_id,
               taggable_data: @publication_tag.merge(
                 author_ids: @author_ids,
@@ -205,12 +215,16 @@ module Chemotion
                 doi = Doi.create_for_analysis!(analysis, sample.molecule.inchikey)
               end
 
+              # create concept and concept doi
+              concept = Concept.create_for_doi!(doi)
+
               # create publication for analyses
               Publication.create!(
                 state: Publication::STATE_PENDING,
                 element: analysis,
                 published_by: current_user.id,
                 doi: doi,
+                concept: concept,
                 taggable_data: @publication_tag.merge(
                   author_ids: @author_ids
                 )
@@ -224,12 +238,18 @@ module Chemotion
               doi = Doi.create_for_element!(sample)
             end
 
+            # update concept
+            previous_version = sample.tag.taggable_data['previous_version']['id']
+            previous_publication = Publication.find_by(element_type: 'Sample', element_id: previous_version)
+            previous_publication.concept.update_for_doi!(doi)
+
             # create publication for sample
             publication = Publication.create!(
               state: Publication::STATE_PENDING,
               element: sample,
               published_by: current_user.id,
               doi: doi,
+              concept: previous_publication.concept,
               parent_id: parent_publication_id,
               taggable_data: @publication_tag.merge(
                 author_ids: @author_ids,
@@ -304,12 +324,16 @@ module Chemotion
             d = Doi.create_for_element!(new_reaction, 'reaction/' + reaction.products_short_rinchikey_trimmed)
           end
 
+          # create concept and concept doi
+          c = Concept.create_for_doi!(d)
+
           pub = Publication.create!(
             state: Publication::STATE_PENDING,
             element: new_reaction,
             original_element: reaction,
             published_by: current_user.id,
             doi: d,
+            concept: c,
             taggable_data: @publication_tag.merge(
               author_ids: @author_ids,
               original_analysis_ids: analysis_set_ids,
@@ -432,12 +456,16 @@ module Chemotion
               doi = Doi.create_for_analysis!(analysis)
             end
 
+            # create concept and concept doi
+            concept = Concept.create_for_doi!(d)
+
             # create publication for analyses
             Publication.create!(
               state: Publication::STATE_PENDING,
               element: analysis,
               published_by: current_user.id,
               doi: doi,
+              concept: concept,
               taggable_data: @publication_tag.merge(
                 author_ids: @author_ids
               )
@@ -451,12 +479,18 @@ module Chemotion
             doi = Doi.create_for_element!(reaction)
           end
 
+          # update concept
+          previous_version = reaction.tag.taggable_data['previous_version']['id']
+          previous_publication = Publication.find_by(element_type: 'Reaction', element_id: previous_version)
+          previous_publication.concept.update_for_doi!(doi)
+
           # create publication for reaction
           publication = Publication.create!(
             state: Publication::STATE_PENDING,
             element: reaction,
             published_by: current_user.id,
             doi: doi,
+            concept: previous_publication.concept,
             taggable_data: @publication_tag.merge(
               author_ids: @author_ids,
               products_rinchi: {

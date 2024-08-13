@@ -22,6 +22,7 @@
 #  review                :jsonb
 #  accepted_at           :datetime
 #  oai_metadata_xml      :text
+#  concept_id            :integer
 #
 # Indexes
 #
@@ -46,6 +47,7 @@ class Publication < ActiveRecord::Base
   belongs_to :element, polymorphic: true
   belongs_to :original_element, polymorphic: true, optional: true
   belongs_to :doi
+  belongs_to :concept
 
   STATE_START = 'start'
 
@@ -416,14 +418,7 @@ class Publication < ActiveRecord::Base
     rights
   end
 
-  def datacite_metadata_xml
-    previous_version = element.tag.taggable_data['previous_version']
-    unless previous_version.nil?
-      previous_version_tag = ElementTag.find_by(taggable_type: element_type,
-                                                taggable_id: previous_version['id'])
-      previous_version_doi = previous_version_tag.taggable_data.fetch('publication', {}).fetch('doi')
-    end
-
+  def datacite_metadata_xml(for_concept: false)
     if parent.nil? && %w[Sample Reaction].include?(element_type)
       coly = element.collections.where(
         <<~SQL
@@ -434,8 +429,26 @@ class Publication < ActiveRecord::Base
     end
     parent_element = parent&.element
     literals = ActiveRecord::Base.connection.exec_query(literals_sql(element_id, element_type))
+
+    if for_concept
+      versions = Publication.where(concept: self.concept)
+    else
+      concept = self.concept
+
+      previous_version_element_id = element.tag.taggable_data.dig('previous_version', 'id')
+      unless previous_version_element_id.nil?
+        previous_version = Publication.find_by(element_type: element_type, element_id: previous_version_element_id)
+      end
+
+      new_version_element_id = element.tag.taggable_data.dig('new_version', 'id')
+      unless new_version_element_id.nil?
+        new_version = Publication.find_by(element_type: element_type, element_id: new_version_element_id)
+      end
+    end
+
     metadata_obj = OpenStruct.new(pub: self, element: element, pub_tag: taggable_data, dois: doi_bag,
-                                  parent_element: parent_element.presence, previous_version_doi: previous_version_doi,
+                                  parent_element: parent_element.presence, concept: concept, versions: versions,
+                                  previous_version: previous_version, new_version: new_version,
                                   rights: rights_data, lits: literals, col_doi: cdoi, cust_sample: cust_sample)
     erb_file = if element_type == 'Container'
                  "app/publish/datacite_metadata_#{parent_element.class.name.downcase}_#{element_type.downcase}.html.erb"
@@ -451,7 +464,9 @@ class Publication < ActiveRecord::Base
 
   def persit_datacite_metadata_xml!
     mt = datacite_metadata_xml
+    cmt = datacite_metadata_xml(for_concept: true)
     self.update!(metadata_xml: mt, oai_metadata_xml: mt)
+    concept.update!(metadata_xml: cmt)
     mt
   end
 
@@ -464,13 +479,18 @@ class Publication < ActiveRecord::Base
   def transition_from_start_to_metadata_uploading!
     return unless valid_transition(STATE_DC_METADATA_UPLOADING)
     mt = datacite_metadata_xml
+    cmt = datacite_metadata_xml(for_concept: true)
     self.update!(metadata_xml: mt, oai_metadata_xml: mt, state: STATE_DC_METADATA_UPLOADING)
+    concept.update!(metadata_xml: cmt)
   end
 
   def transition_from_metadata_uploading_to_uploaded!
     return unless valid_transition(STATE_DC_METADATA_UPLOADED)
+    mds = Datacite::Mds.new
+
+    # register the doi
     if (ENV['DATACITE_MODE'] == 'test' || ENV['PUBLISH_MODE'] == 'production') && scheme_only == false
-      resp = Datacite::Mds.new.upload_metadata(metadata_xml)
+      resp = mds.upload_metadata(metadata_xml)
       success = resp.is_a?(Net::HTTPSuccess)
       message = "#{resp.inspect}: metadata upload#{"ing fail" if !success}ed"
     else
@@ -479,6 +499,19 @@ class Publication < ActiveRecord::Base
     end
     logger([message, metadata])
     raise "#{message}" unless success
+
+    # register the concept doi
+    if (ENV['DATACITE_MODE'] == 'test' || ENV['PUBLISH_MODE'] == 'production') && scheme_only == false
+      resp = mds.upload_metadata(concept.metadata_xml)
+      success = resp.is_a?(Net::HTTPSuccess)
+      message = "#{resp.inspect}: concept metadata upload#{"ing fail" if !success}ed"
+    else
+      success = true
+      message = "concept metadata not uploaded in mode #{ENV['PUBLISH_MODE']}"
+    end
+    logger([message, metadata])
+    raise "#{message}" unless success
+
     self.update!(state: STATE_DC_METADATA_UPLOADED)
   end
 
@@ -490,6 +523,8 @@ class Publication < ActiveRecord::Base
   def transition_from_doi_registering_to_registered!
     return unless valid_transition(STATE_DC_DOI_REGISTERED)
     mds = Datacite::Mds.new
+
+    # mint the doi
     suffix = doi.suffix
     short_doi = "#{mds.doi_prefix}/#{suffix}"
     url = "https://#{mds.doi_domain}/inchikey/#{suffix}"
@@ -503,6 +538,22 @@ class Publication < ActiveRecord::Base
     end
     logger([message, "doi: #{short_doi}", "url: #{url}"])
     raise "#{message}:\n #{short_doi} <-> #{url}" unless success
+
+    # mint the concept doi
+    concept_suffix = concept.doi.suffix
+    concept_short_doi = "#{mds.doi_prefix}/#{concept_suffix}"
+    concept_url = "https://#{mds.doi_domain}/inchikey/#{concept_suffix}"
+    if (ENV['DATACITE_MODE'] == 'test' || ENV['PUBLISH_MODE'] == 'production') && scheme_only == false
+      resp = mds.mint(concept_short_doi, concept_url)
+      success = resp.is_a?(Net::HTTPSuccess)
+      message = "#{resp.inspect}: concept DOI mint#{'ing fail' unless success}ed"
+    else
+      success = true
+      message = "concept DOI not minted in mode #{ENV['PUBLISH_MODE']}"
+    end
+    logger([message, "doi: #{concept_short_doi}", "url: #{concept_url}"])
+    raise "#{message}:\n #{concept_short_doi} <-> #{concept_url}" unless success
+
     doi_date = DateTime.now
     case element_type
     when 'Sample'

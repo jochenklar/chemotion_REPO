@@ -303,6 +303,15 @@ ActiveRecord::Schema.define(version: 2023_04_04_112233) do
     t.index ["deleted_at"], name: "index_computed_props_on_deleted_at"
   end
 
+  create_table "concepts", force: :cascade do |t|
+    t.jsonb "taggable_data"
+    t.integer "doi_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "deleted_at"
+    t.text "metadata_xml"
+  end
+
   create_table "container_hierarchies", id: false, force: :cascade do |t|
     t.integer "ancestor_id", null: false
     t.integer "descendant_id", null: false
@@ -437,7 +446,8 @@ ActiveRecord::Schema.define(version: 2023_04_04_112233) do
     t.integer "doiable_id"
     t.string "doiable_type"
     t.string "suffix"
-    t.index ["inchikey", "molecule_count", "analysis_type", "analysis_count"], name: "index_on_dois", unique: true
+    t.integer "version_count", default: 0
+    t.index ["inchikey", "molecule_count", "analysis_type", "analysis_count", "version_count"], name: "index_on_dois", unique: true
     t.index ["suffix"], name: "index_dois_on_suffix", unique: true
   end
 
@@ -849,6 +859,7 @@ ActiveRecord::Schema.define(version: 2023_04_04_112233) do
     t.jsonb "review"
     t.datetime "accepted_at"
     t.text "oai_metadata_xml"
+    t.integer "concept_id"
     t.index ["ancestry"], name: "index_publications_on_ancestry"
     t.index ["element_type", "element_id", "deleted_at"], name: "publications_element_idx"
   end

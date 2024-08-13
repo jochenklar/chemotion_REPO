@@ -45,7 +45,11 @@ class Doi < ApplicationRecord
       s += "/#{term_id}"
       s += ".#{analysis_count}" if analysis_count.to_i > 0
     end
-    s += "/#{version_count}" if version_count.to_i > 0
+    if version_count.nil?
+      s += "/concept"
+    else
+      s += "/#{version_count}" if version_count.to_i > 0
+    end
     s
   end
 
