@@ -52,6 +52,10 @@ module Chemotion
                 author_ids: @author_ids
               )
             )
+
+            # update the concept with the taggable_data from the publication
+            c.update_tag
+
             # duplicate datasets and copy attachments
             ana.children.where(container_type: 'dataset').each do |ds|
               new_dataset = new_ana.children.create(container_type: 'dataset')
@@ -155,6 +159,9 @@ module Chemotion
                 analysis_ids: new_sample.analyses.pluck(:id)
               )
             )
+
+            # update the concept with the taggable_data from the publication
+            c.update_tag
           end
           new_sample.analyses.each do |ana|
             Publication.find_by(element: ana).update(parent: pub)
@@ -229,6 +236,9 @@ module Chemotion
                   author_ids: @author_ids
                 )
               )
+
+              # update the concept with the taggable_data from the publication
+              concept.update_tag
             end
 
             # create doi for sample
@@ -256,6 +266,9 @@ module Chemotion
                 analysis_ids: sample.analyses.pluck(:id)
               )
             )
+
+            # update the concept with the taggable_data from the publication
+            previous_publication.concept.update_tag
           end
           sample.analyses.each do |analysis|
             Publication.find_by(element: analysis).update(parent: publication)
@@ -345,6 +358,9 @@ module Chemotion
               }
             )
           )
+
+          # update the concept with the taggable_data from the publication
+          c.update_tag
 
           duplicate_analyses(new_reaction, reaction_analysis_set, 'reaction/' + reaction.products_short_rinchikey_trimmed)
           reaction.reactions_samples.each  do |rs|
@@ -470,6 +486,9 @@ module Chemotion
                 author_ids: @author_ids
               )
             )
+
+            # update the concept with the taggable_data from the publication
+            concept.update_tag
           end
 
           # create doi for reaction
@@ -501,6 +520,9 @@ module Chemotion
               }
             )
           )
+
+          # update the concept with the taggable_data from the publication
+          previous_publication.concept.update_tag
 
           reaction.analyses.each do |analysis|
             Publication.find_by(element: analysis).update(parent: publication)

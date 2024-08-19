@@ -14,7 +14,7 @@
 class Concept < ApplicationRecord
   acts_as_paranoid
 
-  belongs_to :publication, optional: true
+  has_many :publications
   belongs_to :doi
 
   def update_for_doi!(doi)
@@ -22,6 +22,13 @@ class Concept < ApplicationRecord
     self.doi.save!
 
     self.metadata_xml = nil
+    self.save!
+  end
+
+  def update_tag
+    self.taggable_data = self.publications.includes(:doi).order(Arel.sql("dois.suffix desc")).map do |publication|
+      publication.taggable_data
+    end
     self.save!
   end
 

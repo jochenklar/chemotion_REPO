@@ -593,6 +593,7 @@ class Publication < ActiveRecord::Base
 
     pd = taggable_data.merge(tag_data)
     self.update!(state: STATE_DC_DOI_REGISTERED,taggable_data: taggable_data.merge(pd))
+    self.concept.update_tag
   end
 
   def transition_from_doi_registered_to_pubchem_registering!
@@ -621,6 +622,7 @@ class Publication < ActiveRecord::Base
       logger([message, mt, "Pubchem FTP upload #{production ? '' : 'NOT'} sent (mode: #{ENV['PUBLISH_MODE']})"])
     end
     self.update!(state: STATE_PUBCHEM_REGISTERED, taggable_data: taggable_data.merge(pd))
+    self.concept.update_tag
   end
 
   def transition_from_pubchem_registered_to_completing!
@@ -677,6 +679,7 @@ class Publication < ActiveRecord::Base
       logger(['moved to collections'])
     end
     self.update!(state: STATE_COMPLETED, taggable_data: taggable_data.merge(pd), published_at: time)
+    self.concept.update_tag
   end
 
   def default_line
