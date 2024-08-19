@@ -215,15 +215,18 @@ module Chemotion
           if sample.analyses.or(sample.links).present?
             # create dois and publications for analyses
             sample.analyses.each do |analysis|
-              # create doi for analysis
-              if (doi = analysis.doi)
-                doi.update(doiable: analysis)
-              else
-                doi = Doi.create_for_analysis!(analysis, sample.molecule.inchikey)
-              end
+              # create doi, concept and concept doi
+              doi = Doi.create_for_analysis!(analysis, sample.molecule.inchikey)
 
-              # create concept and concept doi
-              concept = Concept.create_for_doi!(doi)
+              # create or update concept
+              previous_version = analysis.extended_metadata['previous_version_id']
+              previous_publication = Publication.find_by(element_type: 'Container', element_id: previous_version)
+              if previous_publication.nil?
+                concept = Concept.create_for_doi!(doi)
+              else
+                concept = previous_publication.concept
+                concept.update_for_doi!(doi)
+              end
 
               # create publication for analyses
               Publication.create!(
@@ -242,11 +245,7 @@ module Chemotion
             end
 
             # create doi for sample
-            if (doi = sample.doi)
-              doi.update!(doiable: sample)
-            else
-              doi = Doi.create_for_element!(sample)
-            end
+            doi = Doi.create_for_element!(sample)
 
             # update concept
             previous_version = sample.tag.taggable_data['previous_version']['id']
@@ -465,15 +464,18 @@ module Chemotion
 
           # create dois and publications for analyses
           reaction.analyses.each do |analysis|
-            # create doi for analysis
-            if (doi = analysis.doi)
-              doi.update(doiable: analysis)
-            else
-              doi = Doi.create_for_analysis!(analysis)
-            end
+            # create doi, concept and concept doi
+            doi = Doi.create_for_analysis!(analysis)
 
-            # create concept and concept doi
-            concept = Concept.create_for_doi!(d)
+            # create or update concept
+            previous_version = analysis.extended_metadata['previous_version_id']
+            previous_publication = Publication.find_by(element_type: 'Container', element_id: previous_version)
+            if previous_publication.nil?
+              concept = Concept.create_for_doi!(doi)
+            else
+              concept = previous_publication.concept
+              concept.update_for_doi!(doi)
+            end
 
             # create publication for analyses
             Publication.create!(
@@ -492,11 +494,7 @@ module Chemotion
           end
 
           # create doi for reaction
-          if (doi = reaction.doi)
-            doi.update!(doiable: reaction)
-          else
-            doi = Doi.create_for_element!(reaction)
-          end
+          doi = Doi.create_for_element!(reaction)
 
           # update concept
           previous_version = reaction.tag.taggable_data['previous_version']['id']
