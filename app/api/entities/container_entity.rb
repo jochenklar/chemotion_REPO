@@ -2,10 +2,15 @@ module Entities
   class ContainerEntity < Grape::Entity
     expose :big_tree, merge: true
     expose :dataset_doi
+    expose :concept_doi
   #  expose :doi, if: -> (obj, opts) { obj.respond_to? :doi}
 
     def dataset_doi
       object.full_doi
+    end
+
+    def concept_doi
+      object.concept_doi
     end
 
     def pub_id
@@ -50,6 +55,7 @@ module Entities
     def get_analysis(container, children)
       analysis = container.attributes.slice('id', 'container_type', 'name', 'description')
       analysis['dataset_doi'] = container.full_doi  if container.respond_to? :full_doi
+      analysis['concept_doi'] = container.concept_doi if container.respond_to? :concept_doi
       analysis['pub_id'] = container.publication&.id  if container.respond_to? :publication
       analysis['extended_metadata'] = get_extended_metadata(container)
       dids = []
@@ -57,6 +63,7 @@ module Entities
       analysis['children'] = children.map do |child, _|
         ds = child.attributes.slice('id', 'container_type', 'name', 'description')
         ds['dataset_doi'] = child.full_doi  if child.respond_to? :full_doi
+        ds['concept_doi'] = child.concept_doi if child.respond_to? :concept_doi
         ds['pub_id'] = child.publication&.id  if child.respond_to? :publication
         dids << ds['id']
         ds['extended_metadata'] = get_extended_metadata(child)
@@ -69,6 +76,7 @@ module Entities
 
     def update_analysis(analysis, attachments, code_logs)
       analysis['dataset_doi'] = analysis.full_doi if analysis.respond_to? :full_doi
+      analysis['concept_doi'] = analysis.concept_doi if analysis.respond_to? :concept_doi
       analysis['pub_id'] = analysis.publication&.id if analysis.respond_to? :publication
       analysis['preview_img'] = preview_img(@dataset_ids[analysis['id']], attachments)
       analysis['code_log'] = code_logs.find { |cl| cl.source_id == analysis['id'] }.attributes

@@ -590,12 +590,25 @@ export default class RepoReactionDetails extends Component {
       false;
 
     let showDOI = (
-      <Doi
-        type="reaction"
-        id={reaction.id}
-        doi={isPublished ? taggData.doi : doi}
-        isPublished={isPublished}
-      />
+      <>
+        <Doi
+          type="reaction"
+          id={reaction.id}
+          doi={isPublished ? taggData.doi : doi}
+          isPublished={isPublished}
+        />
+        {
+          reaction.publication.concept && (
+            <Doi
+              type="reaction"
+              id={reaction.id}
+              doi={reaction.publication.concept.doi.full_doi}
+              isPublished={isPublished}
+              concept={true}
+            />
+          )
+        }
+      </>
     );
     if (schemeOnly) {
       buttons = ['Decline', 'Comments', 'Accept'];

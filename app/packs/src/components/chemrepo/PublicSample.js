@@ -61,6 +61,7 @@ const PublicSample = (_props) => {
     <div className="repo-public-sample-info">
       <b>Sample type: </b>{sampleTypeDescription}
       <Doi type="sample" id={sample.id} doi={sample.doi} isPublished={isPublished} />
+      {sample.concept && <Doi type="sample" id={sample.id} doi={sample.concept.doi.full_doi} isPublished={isPublished} concept={true} />}
       <ChemotionId id={pubData.id} type="sample" />
       {embargo}
       <h5>

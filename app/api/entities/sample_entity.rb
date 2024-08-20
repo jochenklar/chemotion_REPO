@@ -6,11 +6,16 @@ module Entities
     expose :segments, using: Entities::SegmentEntity
     expose :publication
     expose :doi, using: Entities::DoiEntity
+    expose :concept, using: Entities::ConceptEntity
     expose :residues
     expose :elemental_compositions, using: Entities::ElementalCompositionEntity
 
     expose :code_log, using: Entities::CodeLogEntity
     expose :is_repo_public
+
+    def concept
+      object.publication.concept unless object.publication.nil?
+    end
 
     def is_repo_public
       cols = object.tag&.taggable_data['collection_labels']&.select do |c|

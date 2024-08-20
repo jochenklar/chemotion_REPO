@@ -18,9 +18,6 @@ class Concept < ApplicationRecord
   belongs_to :doi
 
   def update_for_doi!(doi)
-    self.doi.doiable_id = doi.doiable_id
-    self.doi.save!
-
     self.metadata_xml = nil
     self.save!
   end
@@ -34,6 +31,7 @@ class Concept < ApplicationRecord
 
   def self.create_for_doi!(doi)
     concept_doi = doi.dup
+    concept_doi.doiable = nil
     concept_doi.version_count = nil
     concept_doi.save!
 

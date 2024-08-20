@@ -122,4 +122,9 @@ class Container < ApplicationRecord
     end
     true
   end
+
+  def concept_doi
+    return nil unless (p = Publication.find_by(element_type: 'Container', element_id: self.id))
+    p.concept&.doi&.full_doi
+  end
 end

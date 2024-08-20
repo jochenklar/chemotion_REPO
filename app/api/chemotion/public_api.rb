@@ -816,6 +816,7 @@ module Chemotion
           optional :id, type: Integer, desc: "Id"
           optional :type, type: String, desc: "Type", values: %w[sample reaction container collection]
           optional :inchikey, type: String, desc: "inchikey"
+          optional :concept, type: Boolean, desc: "concept"
         end
         after_validation do
           @type = params['type']&.classify
@@ -830,11 +831,18 @@ module Chemotion
         end
         desc "Download metadata_xml"
         get :download do
-          filename = URI.escape("metadata_#{@type}_#{@publication.element_id}-#{Time.new.strftime("%Y%m%d%H%M%S")}.xml")
+          if params['concept']
+            filename = URI.escape("metadata_#{@type}_#{@publication.element_id}_concept-#{Time.new.strftime("%Y%m%d%H%M%S")}.xml")
+            metadata_xml = @publication.concept.metadata_xml
+          else
+            filename = URI.escape("metadata_#{@type}_#{@publication.element_id}-#{Time.new.strftime("%Y%m%d%H%M%S")}.xml")
+            metadata_xml = @publication.metadata_xml
+          end
           content_type('application/octet-stream')
           header['Content-Disposition'] = "attachment; filename=" + filename
           env['api.format'] = :binary
-          @publication.metadata_xml
+
+          metadata_xml
         end
 
         desc "Download JSON-Link Data"

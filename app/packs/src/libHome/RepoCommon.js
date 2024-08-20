@@ -244,7 +244,11 @@ const isNmrPass = (analysis, sample) => {
 };
 
 const DownloadMetadataBtn = (l) => {
-  const contentUrl = `/api/v1/public/metadata/download?type=${l.type.toLowerCase()}&id=${l.id}`;
+  let contentUrl = `/api/v1/public/metadata/download?type=${l.type.toLowerCase()}&id=${l.id}`;
+  if (l.concept) {
+    contentUrl += '&concept=1'
+  }
+
   return (
     <OverlayTrigger
       placement="bottom"
@@ -264,7 +268,11 @@ const DownloadMetadataBtn = (l) => {
 
 
 const DownloadJsonBtn = (l) => {
-  const contentUrl = `/api/v1/public/metadata/download_json?type=${l.type.toLowerCase()}&id=${l.id}`;
+  let contentUrl = `/api/v1/public/metadata/download_json?type=${l.type.toLowerCase()}&id=${l.id}`;
+  if (l.concept) {
+    contentUrl += '&concept=1'
+  }
+
   return (
     <>
       <OverlayTrigger
@@ -968,6 +976,7 @@ const RenderAnalysisHeader = (props) => {
   } else {
     doiLink = (element.doi && element.doi.full_doi) || '';
   }
+  const conceptLink = element.concept.doi.full_doi
   const nameOrFormula = molecule.iupac_name && molecule.iupac_name !== ''
     ? <span><b>IUPAC Name: </b> {molecule.iupac_name} (<Formula formula={molecule.sum_formular} />)</span>
     : <span><b>Formula: </b> <Formula formula={molecule.sum_formular} /></span>;
@@ -1041,6 +1050,20 @@ const RenderAnalysisHeader = (props) => {
               )
             }
           </h6>
+          {
+            isPublic && (
+              <h6>
+                <b>Sample concept DOI: </b>
+                <span className="sub-title" inline="true">
+                  <Button bsStyle="link" onClick={() => { window.location = `https://dx.doi.org/${conceptLink}`; }}>
+                    {conceptLink}
+                  </Button>
+                  <ClipboardCopyBtn text={`https://dx.doi.org/${conceptLink}`} />
+                  <DownloadMetadataBtn type="sample" id={element.id} concept={true} />
+                </span>
+              </h6>
+            )
+          }
           <h6>
             <b>Sample ID: </b>
             <Button key={`reaction-jumbtn-${element.id}`} bsStyle="link" onClick={() => { window.location = `/pid/${crsId}`; }}>
@@ -1747,6 +1770,17 @@ class RenderPublishAnalysesPanel extends Component {
       </div>
     );
 
+    const conceptLink = isPublic && (
+      <div className="sub-title" inline="true">
+        <b>Analysis concept DOI: </b>
+        <Button bsStyle="link" onClick={() => { window.location = `https://dx.doi.org/${analysis.concept_doi}`; }}>
+          {analysis.concept_doi}
+        </Button>
+        <ClipboardCopyBtn text={`https://dx.doi.org/${analysis.concept_doi}`} />
+        <DownloadMetadataBtn type="container" id={analysis.id} concept={true} />
+      </div>
+    )
+
     const insText = instrumentText(analysis);
     const crdLink = (isPublic === false) ? (
       <div className="sub-title" inline="true">
@@ -1785,6 +1819,7 @@ class RenderPublishAnalysesPanel extends Component {
               <RepoUserComment isLogin={isLogin} id={analysis.id} type={type} pageId={pageId} pageType={pageType} />
             </div>
             {doiLink}
+            {conceptLink}
             {crdLink}
           </div>
           <div className="desc small-p expand-p">
@@ -2294,10 +2329,11 @@ CommentBtn.defaultProps = {
 
 const Doi = (props) => {
   const {
-    type, id, doi, isPublished
+    type, id, doi, isPublished, concept
   } = props;
   let data = '';
-  const title = `${type} DOI:`.replace(/(^\w)/g, m => m.toUpperCase());
+  const title = (concept ? `${type} concept DOI:` : `${type} DOI:`).replace(/(^\w)/g, m => m.toUpperCase());
+
   if (isPublished) {
     data = (
       <span>
@@ -2305,8 +2341,8 @@ const Doi = (props) => {
           {doi}
         </Button>
         <ClipboardCopyBtn text={`https://dx.doi.org/${doi}`} />
-        <DownloadMetadataBtn type={type} id={id} />
-        <DownloadJsonBtn type={type} id={id} />
+        <DownloadMetadataBtn type={type} id={id} concept={concept} />
+        {!concept && <DownloadJsonBtn type={type} id={id} concept={concept}  />}
       </span>
     );
   } else {
@@ -2333,6 +2369,7 @@ Doi.propTypes = {
     PropTypes.object,
   ]).isRequired,
   isPublished: PropTypes.bool.isRequired,
+  concept: PropTypes.bool
 };
 
 export {
