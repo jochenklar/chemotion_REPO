@@ -17,6 +17,10 @@ class Concept < ApplicationRecord
   has_many :publications
   belongs_to :doi
 
+  def latest_publication
+    self.publications.includes(:doi).order(Arel.sql("dois.suffix desc")).first
+  end
+
   def update_for_doi!(doi)
     self.metadata_xml = nil
     self.save!

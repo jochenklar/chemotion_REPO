@@ -186,11 +186,16 @@ class PublicStore {
       this.setState({ molecules: this.molecules });
     }
 
-    // initially, show only the last versions
     moleculeList.moleculeData.published_samples.forEach((sample) => {
-      // eslint-disable-next-line no-param-reassign
-      // sample.show = (sample.new_version === null);
-      sample.show = isNil(sample.new_version) || isNil(moleculeList.moleculeData.published_samples.find((s) => s.sample_id == sample.new_version))
+      if (moleculeList.anchor === 'undefined') {
+        // show the latest versions
+        sample.show = isNil(sample.new_version) || isNil(
+          moleculeList.moleculeData.published_samples.find((s) => s.sample_id == sample.new_version)
+        )
+      } else {
+        // show the version given by the anchor
+        sample.show = sample.doi.endsWith(moleculeList.anchor)
+      }
     });
 
     this.setState({
