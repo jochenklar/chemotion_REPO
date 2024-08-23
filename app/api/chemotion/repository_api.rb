@@ -549,11 +549,10 @@ module Chemotion
           )
           new_analysis.extended_metadata = analysis.extended_metadata
           new_analysis.extended_metadata[:previous_version_id] = analysis.id
-          new_analysis.extended_metadata[:previous_version_doi_id] = previous_doi.id if previous_doi
+          new_analysis.extended_metadata[:previous_version_doi_id] = previous_doi.id
           new_analysis.save!
 
-          analysis.extended_metadata[:new_version_id] = new_analysis.id
-          analysis.save!
+          new_analysis.update_versions
 
           # duplicate datasets and copy attachments
           analysis.children.where(container_type: 'dataset').each do |dataset|

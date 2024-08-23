@@ -1960,6 +1960,17 @@ class RenderPublishAnalyses extends Component {
               hasCoAuthors={(this.props.publication.author_ids.length > 1)}
             />
           </h4>
+          {
+            analysis.versions && (
+              <div style={{ marginBottom: 10 }}>
+                <VersionDropdown
+                  type="Container"
+                  element={analysis}
+                  onChange={(version) => PublicActions.displayDataset(version.id)}
+                />
+              </div>
+            )
+          }
           <p>&nbsp;</p>
           <b>{kind}</b>&nbsp;
           <div style={{ textAlign: 'right', display: 'inline-block', float: 'right' }}>
