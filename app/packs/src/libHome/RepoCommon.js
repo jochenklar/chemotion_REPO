@@ -1904,6 +1904,18 @@ class RenderPublishAnalyses extends Component {
               <DownloadMetadataBtn type="container" id={analysis.id} />
               <DownloadJsonBtn type="container" id={analysis.id} />
             </div>
+            {
+              analysis.concept_doi && (
+                <div className="sub-title" inline="true">
+                  <b>Analysis concept DOI: </b>
+                  <Button bsStyle="link" onClick={() => { window.location = `https://dx.doi.org/${analysis.concept_doi}`; }}>
+                    {analysis.concept_doi}
+                  </Button>
+                  <ClipboardCopyBtn text={`https://dx.doi.org/${analysis.concept_doi}`} />
+                  <DownloadMetadataBtn type="container" id={analysis.id} concept={true} />
+                </div>
+              )
+            }
             <div className="sub-title" inline="true">
               <b>Analysis ID: </b>
               <Button bsStyle="link" onClick={() => { window.location = `/pid/${analysis.pub_id}`; }}>
