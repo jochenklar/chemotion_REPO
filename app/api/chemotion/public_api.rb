@@ -590,7 +590,9 @@ module Chemotion
             ds_json = ContainerSerializer.new(dataset).serializable_hash.deep_symbolize_keys
             ds_json[:dataset_doi] = dataset.full_doi
             ds_json[:concept_doi] = dataset.concept_doi
-            ds_json[:versions] = dataset.versions
+            ds_json[:versions] = dataset.versions.map do |container|
+              {doi: container.full_doi, id: container.id }
+            end
             ds_json[:pub_id] = dataset.publication&.id
 
             res = {

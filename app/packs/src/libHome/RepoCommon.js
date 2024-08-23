@@ -1745,10 +1745,33 @@ AnalysisHeaderSample.defaultProps = {
 };
 
 class RenderPublishAnalysesPanel extends Component {
+
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      analysis: props.analysis,
+      versions: props.analysis.versions
+    }
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.analysis !== this.state.analysis) {
+      this.setState({
+        analysis: nextProps.analysis,
+        versions: [...nextProps.analysis.versions]
+      });
+    }
+  }
+
   header() {
     const {
-      analysis, isPublic, userInfo, isLogin, isReviewer, pageId, type, pageType, element
+      isPublic, userInfo, isLogin, isReviewer, pageId, type, pageType, element
     } = this.props;
+    const {
+      analysis, versions
+    } = this.state;
+
     const content = analysis.extended_metadata['content'];
     const previewImg = previewContainerImage(analysis);
     const kind = (analysis.extended_metadata['kind'] || '').split('|').pop().trim();
@@ -1813,6 +1836,20 @@ class RenderPublishAnalysesPanel extends Component {
         />
         <div className="abstract">
           <div className="lower-text">
+            {
+              versions && (
+                <div style={{ marginBottom: 10 }}>
+                  <VersionDropdown
+                    type="Container"
+                    element={analysis}
+                    versions={versions}
+                    onChange={(version) => {
+                      this.setState({analysis: version})
+                    }}
+                  />
+                </div>
+              )
+            }
             <div className="sub-title">
               <b>{kind}</b>&nbsp;<RepoMolViewerListBtn el={element} container={analysis} isPublic={isPublic} />
               <RepoPublicComment isReviewer={isReviewer} id={analysis.id} type={type} pageId={pageId} pageType={pageType} userInfo={userInfo} title={kind} />&nbsp;

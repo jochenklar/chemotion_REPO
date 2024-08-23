@@ -38,6 +38,12 @@ module Entities
 
       bt.dig('children', 0, 'children')&.each do |container|
         update_analysis(container, attachments, code_logs)
+
+        unless container['versions'].nil?
+          container['versions'].each do |version_container|
+            update_analysis(version_container, attachments, code_logs)
+          end
+        end
       end
       bt
     end
@@ -52,10 +58,16 @@ module Entities
       link
     end
 
-    def get_analysis(container, children)
+    def get_analysis(container, children, add_versions = true)
       analysis = container.attributes.slice('id', 'container_type', 'name', 'description')
       analysis['dataset_doi'] = container.full_doi  if container.respond_to? :full_doi
       analysis['concept_doi'] = container.concept_doi if container.respond_to? :concept_doi
+      if add_versions
+        analysis['versions'] = container.versions.map do |version_container|
+          version_children = version_container.hash_tree[version_container]
+          get_analysis(version_container, version_children, nil)
+        end
+      end
       analysis['pub_id'] = container.publication&.id  if container.respond_to? :publication
       analysis['extended_metadata'] = get_extended_metadata(container)
       dids = []

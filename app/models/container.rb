@@ -130,9 +130,7 @@ class Container < ApplicationRecord
 
   def versions
     version_ids = self.extended_metadata.fetch('versions', '').split('|')
-    Container.where(id: version_ids).order(id: 'desc').map do |container|
-      {doi: container.full_doi, id: container.id }
-    end
+    Container.where(id: version_ids).order(id: 'desc')
   end
 
   def update_versions(versions = nil)
