@@ -133,6 +133,7 @@ export default class RepoSampleDetails extends Component {
         contributors: s.contributors || tagData.contributors,
         creators: s.creators || tagData.creators,
         doi: s.doi || element.doi,
+        concept: s.concept,
         reaction_ids: s.reaction_ids || [],
         showed_name: s.showed_name,
         molecule_iupac: molecule.iupac_name || [],

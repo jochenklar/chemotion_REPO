@@ -36,17 +36,26 @@ module Chemotion
             else
               d = Doi.create_for_analysis!(new_ana, ik)
             end
+
+            # create concept and concept doi
+            c = Concept.create_for_doi!(d)
+
             Publication.create!(
               state: Publication::STATE_PENDING,
               element: new_ana,
               original_element: ana,
               published_by: current_user.id,
               doi: d,
+              concept: c,
               parent: new_element.publication,
               taggable_data: @publication_tag.merge(
                 author_ids: @author_ids
               )
             )
+
+            # update the concept with the taggable_data from the publication
+            c.update_tag
+
             # duplicate datasets and copy attachments
             ana.children.where(container_type: 'dataset').each do |ds|
               new_dataset = new_ana.children.create(container_type: 'dataset')
@@ -132,12 +141,17 @@ module Chemotion
             else
               d = Doi.create_for_element!(new_sample)
             end
+
+            # create concept and concept doi
+            c = Concept.create_for_doi!(d)
+
             pub = Publication.create!(
               state: Publication::STATE_PENDING,
               element: new_sample,
               original_element: sample,
               published_by: current_user.id,
               doi: d,
+              concept: c,
               parent_id: parent_publication_id,
               taggable_data: @publication_tag.merge(
                 author_ids: @author_ids,
@@ -145,6 +159,9 @@ module Chemotion
                 analysis_ids: new_sample.analyses.pluck(:id)
               )
             )
+
+            # update the concept with the taggable_data from the publication
+            c.update_tag
           end
           new_sample.analyses.each do |ana|
             Publication.find_by(element: ana).update(parent: pub)
@@ -198,11 +215,17 @@ module Chemotion
           if sample.analyses.or(sample.links).present?
             # create dois and publications for analyses
             sample.analyses.each do |analysis|
-              # create doi for analysis
-              if (doi = analysis.doi)
-                doi.update(doiable: analysis)
+              # create doi, concept and concept doi
+              doi = Doi.create_for_analysis!(analysis, sample.molecule.inchikey)
+
+              # create or update concept
+              previous_version = analysis.extended_metadata['previous_version_id']
+              previous_publication = Publication.find_by(element_type: 'Container', element_id: previous_version)
+              if previous_publication.nil?
+                concept = Concept.create_for_doi!(doi)
               else
-                doi = Doi.create_for_analysis!(analysis, sample.molecule.inchikey)
+                concept = previous_publication.concept
+                concept.update_for_doi!(doi)
               end
 
               # create publication for analyses
@@ -211,18 +234,23 @@ module Chemotion
                 element: analysis,
                 published_by: current_user.id,
                 doi: doi,
+                concept: concept,
                 taggable_data: @publication_tag.merge(
                   author_ids: @author_ids
                 )
               )
+
+              # update the concept with the taggable_data from the publication
+              concept.update_tag
             end
 
             # create doi for sample
-            if (doi = sample.doi)
-              doi.update!(doiable: sample)
-            else
-              doi = Doi.create_for_element!(sample)
-            end
+            doi = Doi.create_for_element!(sample)
+
+            # update concept
+            previous_version = sample.tag.taggable_data['previous_version']['id']
+            previous_publication = Publication.find_by(element_type: 'Sample', element_id: previous_version)
+            previous_publication.concept.update_for_doi!(doi)
 
             # create publication for sample
             publication = Publication.create!(
@@ -230,12 +258,16 @@ module Chemotion
               element: sample,
               published_by: current_user.id,
               doi: doi,
+              concept: previous_publication.concept,
               parent_id: parent_publication_id,
               taggable_data: @publication_tag.merge(
                 author_ids: @author_ids,
                 analysis_ids: sample.analyses.pluck(:id)
               )
             )
+
+            # update the concept with the taggable_data from the publication
+            previous_publication.concept.update_tag
           end
           sample.analyses.each do |analysis|
             Publication.find_by(element: analysis).update(parent: publication)
@@ -304,12 +336,16 @@ module Chemotion
             d = Doi.create_for_element!(new_reaction, 'reaction/' + reaction.products_short_rinchikey_trimmed)
           end
 
+          # create concept and concept doi
+          c = Concept.create_for_doi!(d)
+
           pub = Publication.create!(
             state: Publication::STATE_PENDING,
             element: new_reaction,
             original_element: reaction,
             published_by: current_user.id,
             doi: d,
+            concept: c,
             taggable_data: @publication_tag.merge(
               author_ids: @author_ids,
               original_analysis_ids: analysis_set_ids,
@@ -321,6 +357,9 @@ module Chemotion
               }
             )
           )
+
+          # update the concept with the taggable_data from the publication
+          c.update_tag
 
           duplicate_analyses(new_reaction, reaction_analysis_set, 'reaction/' + reaction.products_short_rinchikey_trimmed)
           reaction.reactions_samples.each  do |rs|
@@ -425,11 +464,17 @@ module Chemotion
 
           # create dois and publications for analyses
           reaction.analyses.each do |analysis|
-            # create doi for analysis
-            if (doi = analysis.doi)
-              doi.update(doiable: analysis)
+            # create doi, concept and concept doi
+            doi = Doi.create_for_analysis!(analysis)
+
+            # create or update concept
+            previous_version = analysis.extended_metadata['previous_version_id']
+            previous_publication = Publication.find_by(element_type: 'Container', element_id: previous_version)
+            if previous_publication.nil?
+              concept = Concept.create_for_doi!(doi)
             else
-              doi = Doi.create_for_analysis!(analysis)
+              concept = previous_publication.concept
+              concept.update_for_doi!(doi)
             end
 
             # create publication for analyses
@@ -438,18 +483,23 @@ module Chemotion
               element: analysis,
               published_by: current_user.id,
               doi: doi,
+              concept: concept,
               taggable_data: @publication_tag.merge(
                 author_ids: @author_ids
               )
             )
+
+            # update the concept with the taggable_data from the publication
+            concept.update_tag
           end
 
           # create doi for reaction
-          if (doi = reaction.doi)
-            doi.update!(doiable: reaction)
-          else
-            doi = Doi.create_for_element!(reaction)
-          end
+          doi = Doi.create_for_element!(reaction)
+
+          # update concept
+          previous_version = reaction.tag.taggable_data['previous_version']['id']
+          previous_publication = Publication.find_by(element_type: 'Reaction', element_id: previous_version)
+          previous_publication.concept.update_for_doi!(doi)
 
           # create publication for reaction
           publication = Publication.create!(
@@ -457,6 +507,7 @@ module Chemotion
             element: reaction,
             published_by: current_user.id,
             doi: doi,
+            concept: previous_publication.concept,
             taggable_data: @publication_tag.merge(
               author_ids: @author_ids,
               products_rinchi: {
@@ -467,6 +518,9 @@ module Chemotion
               }
             )
           )
+
+          # update the concept with the taggable_data from the publication
+          previous_publication.concept.update_tag
 
           reaction.analyses.each do |analysis|
             Publication.find_by(element: analysis).update(parent: publication)
@@ -495,11 +549,10 @@ module Chemotion
           )
           new_analysis.extended_metadata = analysis.extended_metadata
           new_analysis.extended_metadata[:previous_version_id] = analysis.id
-          new_analysis.extended_metadata[:previous_version_doi_id] = previous_doi.id if previous_doi
+          new_analysis.extended_metadata[:previous_version_doi_id] = previous_doi.id
           new_analysis.save!
 
-          analysis.extended_metadata[:new_version_id] = new_analysis.id
-          analysis.save!
+          new_analysis.update_versions
 
           # duplicate datasets and copy attachments
           analysis.children.where(container_type: 'dataset').each do |dataset|

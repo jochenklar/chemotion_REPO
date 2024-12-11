@@ -40,6 +40,8 @@ module RepositoryHelpers
       end
     end
 
+    concept = Concept.find(pub.concept_id)
+
     schemeList = get_reaction_table(reaction.id)
     entities = Entities::ReactionEntity.represent(reaction, serializable: true)
     entities[:products].each do |p|
@@ -51,7 +53,7 @@ module RepositoryHelpers
       unless pub_product_tag['versions'].nil?
         p[:versions] = pub_product_tag['versions'].reduce([]) do |versions, version_id|
           sample = Sample.find(version_id)
-          if sample.publication.state == 'completed'
+          if sample&.publication&.state == 'completed'
             versions.append Entities::SampleEntity.represent(sample, serializable: true)
           end
           versions
@@ -78,6 +80,7 @@ module RepositoryHelpers
     entities[:versions] = reaction.versions
     entities[:elementType] = 'reaction'
     entities[:segments] = Entities::SegmentEntity.represent(reaction.segments)
+    entities[:publication][:concept] = Entities::ConceptEntity.represent(concept)
     entities
   end
 
@@ -155,6 +158,7 @@ module RepositoryHelpers
       end
       embargo = PublicationCollections.where("(elobj ->> 'element_type')::text = 'Sample' and (elobj ->> 'element_id')::integer = #{s.id}")&.first&.label
       segments = Entities::SegmentEntity.represent(s.segments)
+      concept = Entities::ConceptEntity.represent(pub.concept)
       isPublisher = (current_user.present? && current_user.id == pub.published_by)
       tag.merge(analyses: containers, literatures: literatures,
                 sample_svg_file: s.sample_svg_file, short_label: s.short_label,
@@ -162,7 +166,7 @@ module RepositoryHelpers
                 sample_id: s.id, reaction_ids: reaction_ids, sid: sid, xvial: xvial,
                 embargo: embargo, showed_name: s.showed_name, pub_id: pub.id, ana_infos: ana_infos,
                 pub_info: pub_info, segments: segments, isPublisher: isPublisher, new_version: s.new_version,
-                versions: s.versions)
+                versions: s.versions, concept: concept)
     end
     x = published_samples.select { |s| s[:xvial].present? }
     xvial_com[:hasSample] = x.length.positive?

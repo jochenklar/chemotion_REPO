@@ -44,10 +44,23 @@ module SubmissionHelpers
   end
 
   def accept_new_sample(root, sample)
+    doi = sample&.doi
+
+    # create or update concept
+    previous_version = sample.tag.taggable_data['previous_version']['id']
+    previous_publication = Publication.find_by(element_type: 'Sample', element_id: previous_version)
+    if previous_publication.nil?
+      concept = Concept.create_for_doi!(doi)
+    else
+      concept = previous_publication.concept
+      concept.update_for_doi!(doi)
+    end
+
     pub_s = Publication.create!(
       state: Publication::STATE_PENDING,
       element: sample,
-      doi: sample&.doi,
+      doi: doi,
+      concept: concept,
       published_by: root.published_by,
       parent: root,
       taggable_data: root.taggable_data
@@ -59,10 +72,21 @@ module SubmissionHelpers
 
   def accept_new_analysis(root, analysis, nil_analysis = true)
     if nil_analysis
+      # create or update concept
+      previous_version = analysis.extended_metadata['previous_version_id']
+      previous_publication = Publication.find_by(element_type: 'Container', element_id: previous_version)
+      if previous_publication.nil?
+        concept = Concept.create_for_doi!(analysis.doi)
+      else
+        concept = previous_publication.concept
+        concept.update_for_doi!(analysis.doi)
+      end
+
       ap = Publication.create!(
         state: Publication::STATE_PENDING,
         element: analysis,
         doi: analysis.doi,
+        concept: concept,
         published_by: root.published_by,
         parent: root,
         taggable_data: root.taggable_data

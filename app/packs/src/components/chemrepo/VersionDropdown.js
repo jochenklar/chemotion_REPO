@@ -6,8 +6,9 @@ import { isNil } from 'lodash';
 import PublicActions from '../actions/PublicActions';
 
 const VersionDropdown = (props) => {
-  const { type, element, onChange } = props;
-  const display = !isNil(element.versions) && element.versions.filter((element) => !isNil(element)).length > 1;
+  const { type, element, versions, onChange } = props;
+  const elementVersions = versions || element.versions
+  const display = !isNil(elementVersions) && elementVersions.filter((element) => !isNil(element)).length > 1;
 
   if (display) {
     return (
@@ -17,9 +18,9 @@ const VersionDropdown = (props) => {
         </Dropdown.Toggle>
         <Dropdown.Menu>
           {
-            element.versions.filter((element) => !isNil(element)).map((version) => {
+            elementVersions.filter((element) => !isNil(element)).map((version) => {
               const versionId = isNil(version.id) ? version.sample_id : version.id;
-              const doi = version.taggable_data ? version.taggable_data.doi : version.doi;
+              const doi = version.taggable_data ? version.taggable_data.doi : (version.doi || version.dataset_doi);
 
               if (doi) {
                 return (
